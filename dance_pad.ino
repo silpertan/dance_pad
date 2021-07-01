@@ -22,7 +22,12 @@ int pin_mappings[6] = {0, 1, 2, 3, 4, 5};
 const int TriggerThreshold = 4;
 
 // How many consecutive times to detect a press before sending the button event
-const int DebounceThreshold = 5;
+// Don't stress that this is kind of a lot. Testing with 5 still showed enough bouncing
+// to cause frequent missed steps. It was very frustrating. Steps would sail on by that
+// I knew I had hit. One way to see this more clearly is to use a tool like jstest on Linux
+// that prints out each down/up event for each button and then dance on it like you would in
+// the real game.
+const int DebounceThreshold = 10;
 
 // Enable SERIAL_DEBUG if you need to debug the electricals of the pad
 //#define SERIAL_DEBUG
