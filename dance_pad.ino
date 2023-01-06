@@ -14,12 +14,17 @@
 // This is the LED pin for a Teensy LC, may need to change on other boards
 const int LedPin = 13;
 
+// To give an indication of when and how often this code runs
+const int CyclePin = 23;
+int cycle_state = 0;
+const int StatusPin = 12;
+
 // Pin mappings for where things got soldered
 // These are the #'s from the "A#" pins in the Teensy LC pinout diagram
 int pin_mappings[6] = {0, 1, 2, 3, 4, 5};
 
 // The analog threshold value for triggering a button
-const int TriggerThreshold = 4;
+const int TriggerThreshold = 3;
 
 // How many consecutive times to detect a press before sending the button event
 // Don't stress that this is kind of a lot. Testing with 5 still showed enough bouncing
@@ -27,6 +32,10 @@ const int TriggerThreshold = 4;
 // I knew I had hit. One way to see this more clearly is to use a tool like jstest on Linux
 // that prints out each down/up event for each button and then dance on it like you would in
 // the real game.
+// Time profiling on a TeensyLC showed (with SERIAL_DEBUG disabled):
+// - 72 usec between the start of consecucutive calls to loop()
+// - the signal on my pad is pretty clean, so I'm getting close to 720 usec to register a
+//   button press/release and send a joystick event
 const int DebounceThreshold = 10;
 
 // Enable SERIAL_DEBUG if you need to debug the electricals of the pad
@@ -49,6 +58,8 @@ void setup()
 {
   Serial.begin(38400);
   pinMode(LedPin, OUTPUT);
+  pinMode(CyclePin, OUTPUT);
+  pinMode(StatusPin, OUTPUT);
 
   // The analog pins are configured with internal pull-up resistors, which makes for a very simple
   // circuit. However, this method does not support useful pressure sensitivity adjustments.
@@ -64,10 +75,13 @@ void setup()
 
 void loop()
 {
+  int status = 0;
+
+  cycle_state = !cycle_state;
+  digitalWrite(CyclePin, cycle_state ? HIGH : LOW);
+
   // analog read values
   int analog_values[6] = {0};
-  // check if any buttons are pressed, so we know whether to light the LED
-  bool button_pressed = false;
 
   // read each pin, and set that Joystick button appropriately
   for(int idx = 0; idx < 6; ++idx)
@@ -75,6 +89,7 @@ void loop()
     analog_values[idx] = analogRead(pin_mappings[idx]);
     if(analog_values[idx] < TriggerThreshold)
     {
+      status = 1;
       if (debounce_count[idx] < DebounceThreshold)
       {
         debounce_count[idx]++;
@@ -82,7 +97,6 @@ void loop()
 
       if (debounce_count[idx] == DebounceThreshold)
       {
-        button_pressed = true;
         if (!button_status[idx])
         {
           Joystick.button(idx+1, 1);
@@ -108,11 +122,20 @@ void loop()
     }
   }
 
+  digitalWrite(StatusPin, status ? HIGH : LOW);
+
+  // check if any buttons are pressed, so we know whether to light the LED
+  bool button_pressed = false;
+  for (int idx = 0; idx < 6; idx++)
+  {
+    if (button_status[idx])
+    {
+      button_pressed = true;
+    }
+  }
+
   // Illuminate the LED if a button is pressed
-  if(button_pressed)
-    digitalWrite(LedPin, HIGH);
-  else
-    digitalWrite(LedPin, LOW);
+  digitalWrite(LedPin, button_pressed ? HIGH : LOW);
 
 #ifdef SERIAL_DEBUG
   serial_debug_count++;
